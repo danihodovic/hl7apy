@@ -490,5 +490,48 @@ class TestParser(unittest.TestCase):
                             self.assertEqual(sub_cmp_type, 'leaf')
 
 
+class TestPreserveWhitespace(unittest.TestCase):
+
+    ORU_MSG = (
+        'MSH|^~\\&|A|B|||20240101||ORU^R01|001|P|2.3\r'
+        'OBX|1|TX|R^REPORT^L||   \r'
+        'OBX|2|TX|R^REPORT^L||text with trailing space \r'
+        'OBX|3|TX|R^REPORT^L\r'
+    )
+
+    def test_parse_message_whitespace_only_field_preserved(self):
+        m = parse_message(self.ORU_MSG, find_groups=False, preserve_whitespace=True)
+        obxs = [s for s in m.children if s.name == 'OBX']
+        self.assertEqual(obxs[0].obx_5[0].value, '   ')
+        self.assertEqual(obxs[0].to_er7(), 'OBX|1|TX|R^REPORT^L||   ')
+
+    def test_parse_message_trailing_space_preserved(self):
+        m = parse_message(self.ORU_MSG, find_groups=False, preserve_whitespace=True)
+        obxs = [s for s in m.children if s.name == 'OBX']
+        self.assertEqual(obxs[1].obx_5[0].value, 'text with trailing space ')
+        self.assertEqual(obxs[1].to_er7(), 'OBX|2|TX|R^REPORT^L||text with trailing space ')
+
+    def test_parse_message_missing_field_unaffected(self):
+        m = parse_message(self.ORU_MSG, find_groups=False, preserve_whitespace=True)
+        obxs = [s for s in m.children if s.name == 'OBX']
+        self.assertFalse(obxs[2].obx_5)
+
+    def test_parse_message_default_strips_whitespace(self):
+        m = parse_message(self.ORU_MSG, find_groups=False)
+        obxs = [s for s in m.children if s.name == 'OBX']
+        self.assertFalse(obxs[0].obx_5)
+        self.assertEqual(obxs[0].to_er7(), 'OBX|1|TX|R^REPORT^L')
+        self.assertEqual(obxs[1].obx_5[0].value, 'text with trailing space')
+
+    def test_parse_field_whitespace_value_preserved(self):
+        f = parse_field('   ', name='OBX_5', preserve_whitespace=True)
+        self.assertEqual(f.value, '   ')
+
+    def test_parse_components_whitespace_component_preserved(self):
+        comps = parse_components('   ', field_datatype='TX', preserve_whitespace=True)
+        self.assertEqual(len(comps), 1)
+        self.assertEqual(comps[0].value, '   ')
+
+
 if __name__ == '__main__':
     unittest.main()
