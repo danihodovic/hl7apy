@@ -375,6 +375,18 @@ class TestFT(unittest.TestCase):
         ft = FT('~repetition~')
         self.assertEqual(ft.to_er7(), '\\R\\repetition\\R\\')
 
+    def test_FT_formatting_commands_are_not_escaped(self):
+        ft = FT('line one\\.br\\line two\\.sp2\\\\.in+4\\indented\\.ce\\')
+        self.assertEqual(ft.to_er7(), 'line one\\.br\\line two\\.sp2\\\\.in+4\\indented\\.ce\\')
+
+    def test_FT_hexadecimal_and_charset_escapes_are_not_escaped(self):
+        ft = FT('cr\\X0D\\ set\\C2842\\')
+        self.assertEqual(ft.to_er7(), 'cr\\X0D\\ set\\C2842\\')
+
+    def test_FT_lone_escape_char_is_still_escaped(self):
+        ft = FT('C:\\path \\.unknown\\')
+        self.assertEqual(ft.to_er7(), 'C:\\E\\path \\E\\.unknown\\E\\')
+
     def test_FT_highlights(self):
         ft = FT('HIGHLIGHTEDTEXTIMPORTANT', highlights=((0, 11), (18, 24)))
         self.assertEqual(ft.to_er7(), '\\H\\HIGHLIGHTED\\N\\TEXTIMP\\H\\ORTANT\\N\\')

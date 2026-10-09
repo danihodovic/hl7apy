@@ -116,6 +116,9 @@ class TextualDataType(BaseDataType):
         greater than :attr:`max_length`
     """
 
+    # Escape sequences made of one letter between escape chars, e.g. \S\; v2.7 adds L (truncation).
+    single_letter_escapes = 'HNFSTRE'
+
     def __init__(self, value, max_length=32, highlights=None,
                  validation_level=None):
         self.highlights = highlights
@@ -171,16 +174,30 @@ class TextualDataType(BaseDataType):
         # Escapes encoding_chars
         for char, esc_seq in translations:
             value = value.replace(char, esc_seq)
-        # Escapes the escape_char. If it is found in other escape sequences it is not escaped.
-        # For example if the escape char is / and we find /H/ the escape chars are not re-escaped,
-        # otherwise it would become /E/H/E/ which is not the result wanted.
-        # Thus the regex search for escape chars not followed and not preceeded by one of the litteral
-        # composing an escape sequence. We use lambda because otherwise the backslash sequence in the string
-        # is processed (look for re.sub in python doc) and we don't want this
-        value = re.sub(self._get_escape_char_regex(escape_char),
-                       lambda x: '{esc}E{esc}'.format(esc=escape_char), value)
+        # Escapes the escape_char, except inside a complete escape sequence: if the escape char is / and we find
+        # /H/ or /.br/ the escape chars are not re-escaped, otherwise they would become /E/H/E/ or /E/.br/E/ and a
+        # formatting command would turn into literal text. The value is split on whole sequences so only the
+        # escape chars between them are escaped.
+        sequence_regex = re.compile('(%s)' % self._get_escape_sequence_regex(escape_char))
+        escaped_char = '{esc}E{esc}'.format(esc=escape_char)
+        parts = sequence_regex.split(value)
+        for index in range(0, len(parts), 2):
+            parts[index] = parts[index].replace(escape_char, escaped_char)
+        return ''.join(parts)
 
-        return value
+    def _get_escape_sequence_regex(self, escape_char):
+        """
+        A complete escape sequence (HL7 v2.5 section 2.7): the separator and highlighting escapes, the formatting
+        commands of FT and TX values, and the hexadecimal and character-set escapes.
+        """
+        esc = re.escape(escape_char)
+        body = ('[' + self.single_letter_escapes + ']'
+                r'|\.(?:br|fi|nf|ce|sp[+-]?\d*|sk[+-]?\d*|in[+-]?\d*|ti[+-]?\d*)'
+                r'|X[0-9A-Fa-f]*'
+                r'|Z[^{esc}]*'
+                r'|C[0-9A-Fa-f]{{4}}'
+                r'|M[0-9A-Fa-f]{{4}}(?:[0-9A-Fa-f]{{2}})?').format(esc=esc)
+        return '{esc}(?:{body}){esc}'.format(esc=esc, body=body)
 
 
 class NumericDataType(BaseDataType):
