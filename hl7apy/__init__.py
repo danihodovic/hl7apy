@@ -227,6 +227,11 @@ def set_default_encoding_chars(encoding_chars):
     _DEFAULT_ENCODING_CHARS = encoding_chars
 
 
+# Loaded libraries by version. Every element construction and datatype check loads its version's
+# library, tens of thousands of times for one large message, so import_module is only called once.
+_LOADED_LIBRARIES = {}
+
+
 def load_library(version):
     """
     Load the correct module according to the version
@@ -235,9 +240,14 @@ def load_library(version):
     :param version: the version of the library to be loaded (e.g. '2.6')
     :rtype: module object
     """
+    try:
+        return _LOADED_LIBRARIES[version]
+    except (KeyError, TypeError):
+        pass
     check_version(version)
     module_name = SUPPORTED_LIBRARIES[version]
     lib = importlib.import_module(module_name)
+    _LOADED_LIBRARIES[version] = lib
     return lib
 
 

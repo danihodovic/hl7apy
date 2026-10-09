@@ -530,6 +530,22 @@ class ElementList(MutableSequence):
         return repr(self.list)
 
 
+# Parsed structures by (id(reference), element class); see ElementFinder.get_structure.
+_STRUCTURES = {}
+
+# cls_attrs as a frozenset per class. Element.__setattr__ checks membership on every attribute write, hundreds of
+# thousands of times for one large message, and cls_attrs stays a list so subclasses can still extend it with +.
+_CLS_ATTR_NAMES = {}
+
+
+def _cls_attr_names(cls):
+    try:
+        return _CLS_ATTR_NAMES[cls]
+    except KeyError:
+        names = _CLS_ATTR_NAMES[cls] = frozenset(cls.cls_attrs)
+        return names
+
+
 class ElementFinder(object):
 
     @staticmethod
@@ -552,7 +568,18 @@ class ElementFinder(object):
                 raise InvalidName(element.classname, element.name)
         if not isinstance(reference, Sequence):
             raise Exception
-        return ElementFinder._parse_structure(element, reference)
+        # The parsed structure only depends on the reference and the element class, and elements only read it, so
+        # it is built once per pair. The reference is kept in the cache so its id can't be reused by another object.
+        key = (id(reference), type(element))
+        try:
+            cached_reference, structure = _STRUCTURES[key]
+            if cached_reference is reference:
+                return structure
+        except KeyError:
+            pass
+        structure = ElementFinder._parse_structure(element, reference)
+        _STRUCTURES[key] = (reference, structure)
+        return structure
 
     @staticmethod
     def _parse_structure(element, reference):
@@ -843,13 +870,13 @@ class Element(object):
         raise NotImplementedError
 
     def __getattr__(self, name):
-        if hasattr(self, 'children') and name not in self.cls_attrs:
+        if hasattr(self, 'children') and name not in _cls_attr_names(type(self)):
             return self.children.get(name)
         else:
             raise AttributeError(name)
 
     def __setattr__(self, name, value):
-        if name in self.cls_attrs:
+        if name in _cls_attr_names(type(self)):
             if name == 'children':
                 children = []
                 if not isinstance(value, ElementList):
@@ -864,7 +891,7 @@ class Element(object):
             self.children.set(name, value, 0)
 
     def __delattr__(self, name):
-        if name in self.cls_attrs:
+        if name in _cls_attr_names(type(self)):
             super(Element, self).__delattr__(name)
         else:
             self.children.remove_by_name(name)
