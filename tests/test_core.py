@@ -781,6 +781,15 @@ class TestSegment(unittest.TestCase):
         s.value = qpd_str
         self.assertEqual(s.to_er7(), qpd_str)
 
+    def test_assign_value_keeps_repetition_order(self):
+        s = parse_segment('PID|1||A~B~C||SURNAME^NAME')
+        s.pid_3 = 'X'
+        self.assertEqual(s.to_er7(), 'PID|1||X~B~C||SURNAME^NAME')
+
+        s = parse_segment('PID|1||A~B~C||SURNAME^NAME', validation_level=VALIDATION_LEVEL.STRICT)
+        s.pid_3 = 'X'
+        self.assertEqual(s.to_er7(), 'PID|1||X~B~C||SURNAME^NAME')
+
     def test_assign_value_traversal(self):
         segment_str = 'PID|1||123-456-789^^^HOSPITAL^MR||SURNAME^NAME^A|||M|||1111 SOMEWHERE STREET^^SOMEWHERE^^^USA||555-555-2004~444-333-222|||M\r'
 

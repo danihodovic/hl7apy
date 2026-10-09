@@ -239,6 +239,13 @@ class ElementList(MutableSequence):
         :type child: :class:`Element <hl7apy.core.Element>`
         :param child: an instance of an :class:`Element <hl7apy.core.Element>` subclass
         """
+        if child.parent != self.element and child.traversal_parent != self.element:
+            # Adopt the child without the parent setter: it calls add(), which appends the child at the
+            # end, so a replaced repetition (e.g. PID_3 = 'X' on A~B) would come out as B~X, not X~B.
+            if not self.element._is_valid_child(child):
+                raise ChildNotValid(child, self.element)
+            child._parent = self.element
+            child.traversal_parent = None
         if self._can_add_child(child):
             try:
                 if by_name_index == -1:
