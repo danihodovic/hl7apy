@@ -42,6 +42,8 @@ class TextualDataType(BaseTextualDataType):
                     (encoding_chars['SUBCOMPONENT'], '{esc}T{esc}'.format(esc=escape_char)),
                     (encoding_chars['REPETITION'], '{esc}R{esc}'.format(esc=escape_char)),)
 
+    single_letter_escapes = 'HNFSTREL'
+
     def _get_escape_char_regex(self, escape_char):
         return r'(?<!%s[HNFSTREL])%s(?![HNFSTREL]%s)' % tuple(3 * [re.escape(escape_char)])
 
